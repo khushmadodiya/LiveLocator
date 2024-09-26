@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "942397338758",
+    "firebase_url": "https://livelocation-65082-default-rtdb.firebaseio.com",
+    "project_id": "livelocation-65082",
+    "storage_bucket": "livelocation-65082.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942397338758:android:f658fe928d0fe6e80a4d07",
+        "android_client_info": {
+          "package_name": "com.example.live_location"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBecRntxe_SJYzpx6hddd72-SFtTLB9Rzc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
