@@ -46,7 +46,7 @@ class AuthMethod {
           await _firestore
               .collection('users')
               .doc(cred.user!.uid)
-              .set(user.toJson());
+              .set({...user.toJson(),'status':'false'});
 
         res = 'success';
         return res;

@@ -3,6 +3,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:live_location/Auth/text_field.dart';
 
@@ -36,13 +37,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() {
       flag = true;
     });
-    String res= await AuthMethod().signup(email: emailcontroller.text.trim(), password: passcontroller.text.trim(), name: namecontroller.text.trim(), file: _image!);
-    shosnacbar(context, res);
-    setState(() {
-      flag = false;
-    });
-    if(res=='success'){
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context)=>LoginScreen()));
+    if(_image == null){
+      Fluttertoast.showToast(msg: 'Please select image');
+      setState(() {
+        flag = false;
+      });
+    }
+    else {
+      String res = await AuthMethod().signup(email: emailcontroller.text.trim(),
+          password: passcontroller.text.trim(),
+          name: namecontroller.text.trim(),
+          file: _image!);
+      shosnacbar(context, res);
+
+      setState(() {
+        flag = false;
+      });
+      if (res == 'success') {
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (context) => LoginScreen()));
+      }
     }
 
 

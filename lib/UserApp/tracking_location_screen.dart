@@ -1,17 +1,26 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'map.dart';
 
 
 
-class TrackUser extends StatelessWidget {
+class TrackUser extends StatefulWidget {
   final uid;
-  const TrackUser({super.key, this.uid});
+  // final address;
+  const TrackUser({super.key, this.uid,});
+
   @override
+  State<TrackUser> createState() => _TrackUserState();
+}
+
+class _TrackUserState extends State<TrackUser> {
+
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +32,7 @@ class TrackUser extends StatelessWidget {
         stream: FirebaseDatabase.instance
             .ref()
             .child('delivery')
-            .child(uid)
+            .child(widget.uid)
             .onValue,
         builder: (context, snapshot) {
           if (ConnectionState.waiting == snapshot.connectionState) {
@@ -36,10 +45,12 @@ class TrackUser extends StatelessWidget {
             return const Text('Some error occurred');
           }
           if (snapshot.hasData) {
-            final data = snapshot.data!.snapshot.value as Map<dynamic, dynamic>?;
+            final data = snapshot.data!.snapshot.value as Map<dynamic,
+                dynamic>?;
             print(data);
             final lat = data!['latitude'];
             final lng = data['longitude'];
+
             return MapSample(
               lat: lat,
               lng: lng,
@@ -50,4 +61,5 @@ class TrackUser extends StatelessWidget {
       ),
     );
   }
-}
+
+  }

@@ -1,22 +1,21 @@
 
 import 'dart:async';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:get/get.dart';
+import 'package:get/get_state_manager/get_state_manager.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:live_location/Auth/authmethods.dart';
-import 'package:live_location/DeleveryBoy/delevery_location_service.dart';
+import 'package:live_location/GetX/getx.dart';
 import 'package:live_location/profile.dart';
 import 'package:live_location/provider/provider.dart';
 import 'package:provider/provider.dart';
 
 import 'UserApp/select_user_id_screen.dart';
-import 'UserApp/tracking_location_screen.dart';
 
-Position? _currentPostion;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,33 +25,31 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final Completer<GoogleMapController> _controller = Completer<
-      GoogleMapController>();
-  List<Marker> _markers = [];
-
-  String _currentAddress = 'Fetching address...';
+  final MapController mapController = Get.put(MapController());
+  final MarkersForLocation markers = Get.put(MarkersForLocation());
   StreamSubscription<Position>? _positionStreamSubscription;
   final DatabaseReference _locationRef = FirebaseDatabase.instance.ref(
       'delivery').child(FirebaseAuth.instance.currentUser!.uid);
 
-  bool flag = false;
-  bool location= false;
   Position?_currentPosition;
+  final CheckBool flag = Get.put(CheckBool());
+  final GetAddress _address = Get.put(GetAddress());
 
-  @override
+ @override
   void initState() {
+    // TODO: implement initState
     super.initState();
-    // FlutterForegroundService().start();
-    AddMarker();
+    markers.AddMarker();
     _startLocationTracking();
   }
 
 
   void _startLocationTracking() async {
     try {
-      setState(() {
-        flag = true;
-      });
+      flag.ChangehomeFlag();
+      Future.delayed(Duration(seconds: 5),(){flag.ChangehomelocationFlag();flag.ChangehomeFlag();});
+      print(flag.homeflag.value);
+      await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({'status':'true'});
       _positionStreamSubscription = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high, distanceFilter: 2),
@@ -60,14 +57,8 @@ class _HomeScreenState extends State<HomeScreen> {
         if (position != null) {
 
           _currentPosition = position;
-          // Send location data to Firebase
-          _getAddressFromLatLng(position.latitude, position.longitude);
-          setState(() {
-            location = true;
-            flag =false;
-            _updateMarker();
-            _animateToLocation();
-          });
+          _address.Updateaddress(position.latitude, position.longitude);
+          _updateMarkerAndAnimateCamera();
 
           _locationRef.set({
             'latitude': position.latitude,
@@ -91,156 +82,131 @@ class _HomeScreenState extends State<HomeScreen> {
     // _stopTracking();
   }
 
+
   void _stopTracking() {
-    setState(() {
-      location = false;
-    });
+    flag.ChangehomelocationFlag();
     _positionStreamSubscription
-        ?.cancel(); // Cancel the subscription to stop the stream
+        ?.cancel();
+    updateStatus();
   }
-
-  Future<void> _getAddressFromLatLng(double lat, double lng) async {
-    try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
-
-      Placemark place = placemarks[0];
-
-      setState(() {
-        _currentAddress =
-        "${place.street}, ${place.locality}, ${place
-            .postalCode}, ${place.country}";
-
-      });
-    } catch (e) {
-      print(e);
-    }
+  
+  void _updateMarkerAndAnimateCamera() {
+    markers.UpdateMarker(_currentPosition!.latitude, _currentPosition!.longitude);
+    mapController.animateCameraToPosition(_currentPosition!.latitude, _currentPosition!.longitude);
   }
 
 
-  void AddMarker() {
-    _markers.add(
-        Marker(
-            markerId: MarkerId('Live_Location'),
-            position:LatLng(23.2571449,77.4898325),
-            infoWindow: InfoWindow(
-              title: 'Current Location',
-              snippet: 'This is the your current location',
-            )
-        )
-
-    );
-  }
-  void _updateMarker() {
-    setState(() {
-      _markers[0] = Marker(
-          markerId: const MarkerId('Live_Location'),
-          position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude), // Update marker position
-          infoWindow: InfoWindow(
-            title: 'Current Location',
-            snippet: 'This is the your current location',
-          )
-      );
-    });
-  }
-
-  Future<void> _animateToLocation() async {
-    final GoogleMapController controller = await _controller.future;
-    controller.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-          zoom: 16,
-        ),
-      ),
-    );
-  }
   @override
   Widget build(BuildContext context) {
     var  snap =  Provider.of<AppState>(context,listen: false).snapshot;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Livelocator"),
-       actions:[
-         InkWell(
-           onTap: ()=>Navigator.push(context, MaterialPageRoute(builder: (context)=>ProfileScreen())),
-           child: Padding(
-             padding: const EdgeInsets.symmetric(horizontal: 10.0),
-             child:snap['photoUrl']!=null?CircleAvatar(
-               radius: 20,
-               backgroundImage: NetworkImage(snap['photoUrl']),
-             ): CircleAvatar(
-               radius: 17,
-               child: Icon(Icons.person,size: 30,),
+    return WillPopScope(
+      onWillPop: () async{
+        updateStatus();
+        return true;   },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text("Livelocator"),
+         actions:[
+           InkWell(
+             onTap: ()=>Navigator.push(context, MaterialPageRoute(builder: (context)=>ProfileScreen())),
+             child: Padding(
+               padding: const EdgeInsets.symmetric(horizontal: 10.0),
+               child:snap['photoUrl']!=null?CircleAvatar(
+                 radius: 20,
+                 backgroundImage: NetworkImage(snap['photoUrl']),
+               ): CircleAvatar(
+                 radius: 17,
+                 child: Icon(Icons.person,size: 30,),
+               ),
              ),
-           ),
-         )
-       ]
-      ),
-      body: Column(
-        // mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
+           )
+         ]
+        ),
+        body: Column(
+          // mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
 
-          Center(child:location?
-          Text('Sharing your Location...',style: TextStyle(fontSize: 20,fontWeight: FontWeight.bold),):
-          Text('Not sharing your location will',style: TextStyle(fontSize: 18,fontWeight: FontWeight.bold),)),
-          if(!location)Text('only see last location',style: TextStyle(fontSize: 18,fontWeight: FontWeight.bold),),
-          ShowLiveLocationMap(),
-          SizedBox(height: 10,),
-          InkWell(
-            onTap: (){
-              Navigator.push(context,MaterialPageRoute(builder: (context)=>SelectUser()));
+            Obx(() {
+              return Center(child: flag.homelocationflag.value ?
+              Text('Sharing your Location...',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),) :
+              Column(
+                children: [
+                  Text('Not sharing your location will',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),),
+                  if(!flag.homelocationflag.value)Text('only see last location',style: TextStyle(fontSize: 18,fontWeight: FontWeight.bold),)
+                ],
+              ));
 
-            },
-            child: Column(
-              children: [
-                const  Text('Track Location',style: TextStyle(fontSize: 20),),
-                Card(
-                  elevation: 8,
-                  child: Container(
-                    height: MediaQuery.of(context).size.height*.2,
-                    child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.asset('assets/tracklocation.jpg')),
+            }),
+            ShowLiveLocationMap(),
+            SizedBox(height: 10,),
+            InkWell(
+              onTap: (){
+                Navigator.push(context,MaterialPageRoute(builder: (context)=>SelectUser()));
+
+              },
+              child: Column(
+                children: [
+                  const  Text('Track Location',style: TextStyle(fontSize: 20),),
+                  Card(
+                    elevation: 8,
+                    child: Container(
+                      height: MediaQuery.of(context).size.height*.2,
+                      child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.asset('assets/tracklocation.jpg')),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-        ],
-      ),
-
-      floatingActionButton:FloatingActionButton(
-        backgroundColor: Colors.deepPurple,
-        child: location ? Center(child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Stop',style: TextStyle(fontSize: 15,fontWeight: FontWeight.bold,color: Colors.white),),
-            Text('sharing',style: TextStyle(fontSize: 15,fontWeight: FontWeight.bold,color: Colors.white),),
           ],
-        )) : flag ? Center(child: CircularProgressIndicator(color: Colors.white,)):Center(child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Start',style: TextStyle(fontSize: 15,fontWeight: FontWeight.bold,color: Colors.white)),
-            Text('sharing',style: TextStyle(fontSize: 15,fontWeight: FontWeight.bold,color: Colors.white)),
-          ],
-        )),
-        onPressed: () {
-          setState(() {
-            if(location){
-              _stopTracking();
-            }
-            else{
-              _startLocationTracking();
-            }
+        ),
+        floatingActionButton:
+          FloatingActionButton(
+              backgroundColor: Colors.deepPurple,
+              child:Obx(
+                  (){
+                   return  flag.homelocationflag.value ? Center(child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Stop', style: TextStyle(fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),),
+                        Text('sharing', style: TextStyle(fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),),
+                      ],
+                    )) : flag.homeflag.value
+                        ? Center(
+                        child: CircularProgressIndicator(color: Colors.white,))
+                        : Center(child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Start', style: TextStyle(fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white)),
+                        Text('sharing', style: TextStyle(fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white)),
+                      ],
+                    ));
+                  }
+              ),
+              onPressed: () {
+                if (flag.homelocationflag.value) {
+                  _stopTracking();
+                }
+                else {
+                  _startLocationTracking();
+                }
+              }
 
-          });
-
-        },
-
-
+        ),
       ),
     );
   }
@@ -248,25 +214,38 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget ShowLiveLocationMap(){
     return  Column(
       children: [
-        _currentPosition==null ? Center(child: CircularProgressIndicator(),):Text('Address: $_currentAddress',style: TextStyle(fontWeight:FontWeight.bold,fontSize: 16),)
+        Obx(() => Text('Address: ${_address.address.value}',style: TextStyle(fontWeight:FontWeight.bold,fontSize: 16)))
 ,SizedBox(height: 7,),
         Container(
-            height: MediaQuery.of(context).size.height*.45,
-            child: GoogleMap(
-              markers: Set<Marker>.of(_markers),
-              mapType: MapType.hybrid,
-              initialCameraPosition: CameraPosition(
-                target: LatLng(23.2571449,77.4898325),
-                zoom: 16,
-              ),
-              onMapCreated: (GoogleMapController controller) {
-                _controller.complete(controller);
-              },
+            height: MediaQuery.of(context).size.height*.49,
+            child:Obx(
+                (){
+                  return GoogleMap(
+                    markers: Set<Marker>.of(markers.markers.value),
+                    mapType: MapType.hybrid,
+                    initialCameraPosition: CameraPosition(
+                      target: LatLng(23.2571449,77.4898325),
+                      zoom: 16,
+                    ),
+                    onMapCreated: (GoogleMapController controller) {
+                      mapController.onMapCreated(controller);
+                    },
+                  );
+                }
             )
         ),
 
       ],
     );;
+  }
+
+  void updateStatus() async{
+   try{
+     await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({'status':'false'});
+
+   }catch(e){
+     print(e);
+   }
   }
 
 

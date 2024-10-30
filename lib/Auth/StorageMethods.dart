@@ -7,8 +7,7 @@ FirebaseStorage _storage = FirebaseStorage.instance;
 FirebaseAuth _auth = FirebaseAuth.instance;
 class StorageMethods{
  Future<String> storeprofile(Uint8List file,String s)async{
-    var uid = Uuid().v1().substring(0,4);
-    Reference ref =  s=='spot'?_storage.ref().child(s).child(uid): _storage.ref().child(s).child(_auth.currentUser!.uid);
+    Reference ref =  _storage.ref().child(s).child(_auth.currentUser!.uid);
     UploadTask uploadTask = ref.putData(file);
     TaskSnapshot snapshot = await uploadTask;
     String url = await snapshot.ref.getDownloadURL();

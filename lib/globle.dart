@@ -8,7 +8,7 @@ int _currentPosition=0;
 
 pickImage(ImageSource source) async {
   final ImagePicker imagePicker = ImagePicker();
-  XFile? file = await imagePicker.pickImage(source: source);
+  XFile? file = await imagePicker.pickImage(source: source,imageQuality: 30);
   if (file != null) {
     return await file.readAsBytes();
   }

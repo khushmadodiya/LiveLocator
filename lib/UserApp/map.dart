@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../globle.dart';
 
@@ -16,11 +18,14 @@ class MapSample extends StatefulWidget {
 class MapSampleState extends State<MapSample> {
   final Completer<GoogleMapController> _controller = Completer<GoogleMapController>();
   List<Marker> _markers = [];
+  String _currentAddress = '';
 
   @override
   void initState() {
     super.initState();
     _addMarker();
+    _getAddressFromLatLng(widget.lat, widget.lng);
+
   }
 
   @override
@@ -29,21 +34,32 @@ class MapSampleState extends State<MapSample> {
     if (oldWidget.lat != widget.lat || oldWidget.lng != widget.lng) {
       _updateMarker();
       _animateToLocation();
+      _getAddressFromLatLng(widget.lat, widget.lng);
+
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return GoogleMap(
-      markers: Set<Marker>.of(_markers),
-      mapType: MapType.hybrid,
-      initialCameraPosition: CameraPosition(
-        target: LatLng(widget.lat, widget.lng),
-        zoom: 16,
-      ),
-      onMapCreated: (GoogleMapController controller) {
-        _controller.complete(controller);
-      },
+    return Column(
+      children: [
+        Text('Address : ${_currentAddress}',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),),
+        SizedBox(height: 10,),
+        Expanded(
+          child: GoogleMap(
+            markers: Set<Marker>.of(_markers),
+            mapType: MapType.hybrid,
+            initialCameraPosition: CameraPosition(
+              target: LatLng(widget.lat, widget.lng),
+              zoom: 16,
+            ),
+            onMapCreated: (GoogleMapController controller) {
+              _controller.complete(controller);
+            },
+          ),
+        ),
+      ],
     );
   }
   void _addMarker()async {
@@ -98,5 +114,22 @@ class MapSampleState extends State<MapSample> {
         ),
       ),
     );
+  }
+  Future<void> _getAddressFromLatLng(double lat, double lng) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
+
+      Placemark place = placemarks[0];
+      print(placemarks);
+      setState(() {
+        _currentAddress =
+        "${place.street}, ${place.locality}, ${place
+            .postalCode}, ${place.country}";
+      });
+    print(_currentAddress);
+    print('hellllllllllooooooooooooooooooooooooooooooooooooooooooooooooooooooooo');
+    } catch (e) {
+      print(e);
+    }
   }
 }

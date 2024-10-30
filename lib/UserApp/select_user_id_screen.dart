@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:live_location/UserApp/tracking_location_screen.dart';
-import 'package:live_location/provider/provider.dart';
 import 'package:provider/provider.dart';
+
+import '../provider/provider.dart';
 
 class SelectUser extends StatefulWidget {
   const SelectUser({super.key});
@@ -12,35 +14,27 @@ class SelectUser extends StatefulWidget {
 }
 
 class _SelectUserState extends State<SelectUser> {
-  final TextEditingController controller = TextEditingController();
-  String searchTerm = '';
-
-  @override
-  void initState() {
-    super.initState();
-    controller.addListener(() {
-      setState(() {
-        searchTerm = controller.text.toLowerCase(); // Update search term on text change
-      });
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    final controllerProvider = Provider.of<ControllerProvider>(context);
+    final searchController = controllerProvider.searchUserController;
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Track User'),
-        // toolbarHeight: 30,
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // SizedBox(height: 30),
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: TextField(
-                controller: controller,
+                controller: searchController,
+                onChanged: (value) {
+                  // Notify the listeners whenever the search term changes
+                  controllerProvider.notifyListeners();
+                },
                 decoration: const InputDecoration(
                   hintText: 'Search by username',
                   border: OutlineInputBorder(
@@ -67,10 +61,13 @@ class _SelectUserState extends State<SelectUser> {
                     return Center(child: Text('No users found'));
                   }
 
-                  var snap = Provider.of<AppState>(context,listen: false).snapshot;
+                  var snap = Provider.of<AppState>(context, listen: false).snapshot;
+
+                  // Filter users based on the search input
                   var filteredUsers = snapshot.data!.docs.where((doc) {
                     var username = doc['username'].toString().toLowerCase();
-                    return username.contains(searchTerm)&& doc['uid'] !=snap['uid'];
+                    return username.contains(searchController.text.toLowerCase()) &&
+                        doc['uid'] != snap['uid'];
                   }).toList();
 
                   if (filteredUsers.isEmpty) {
@@ -83,12 +80,11 @@ class _SelectUserState extends State<SelectUser> {
                       var userDoc = filteredUsers[index];
                       return InkWell(
                         onTap: () {
+                          // Navigate to track user screen
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => TrackUser(
-                                uid: userDoc['uid'],
-                              ),
+                              builder: (context) => TrackUser(uid: userDoc['uid']),
                             ),
                           );
                         },
@@ -101,19 +97,43 @@ class _SelectUserState extends State<SelectUser> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                leading: CircleAvatar(
+                                leading: userDoc['photoUrl'] != ''
+                                    ? CircleAvatar(
+                                  backgroundImage: NetworkImage(userDoc['photoUrl']),
+                                )
+                                    : CircleAvatar(
                                   child: Icon(
                                     Icons.person,
                                     color: Colors.black,
                                   ),
                                 ),
-                                title: Text(
-                                  userDoc['username'],
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
-                                  ),
+                                title: Row(
+                                  children: [
+                                    Text(
+                                      userDoc['username'],
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue,
+                                      ),
+                                    ),
+                                    Expanded(child: SizedBox()),
+                                    userDoc['status'] == 'true'
+                                        ? Padding(
+                                      padding: const EdgeInsets.only(top: 20),
+                                      child: Text(
+                                        'Online',
+                                        style: TextStyle(color: Colors.deepPurple),
+                                      ),
+                                    )
+                                        : Padding(
+                                      padding: const EdgeInsets.only(top: 20.0),
+                                      child: Text(
+                                        'Offline',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 subtitle: Text(
                                   userDoc['email'],
@@ -122,11 +142,16 @@ class _SelectUserState extends State<SelectUser> {
                                     color: Colors.black54,
                                   ),
                                 ),
-                                trailing: Icon(
-                                    Icons.location_on_outlined,
-                                    color: Colors.redAccent,
-                                    size: 30,
-
+                                trailing: userDoc['status'] == 'true'
+                                    ? Icon(
+                                  Icons.location_on_outlined,
+                                  color: Colors.deepPurple,
+                                  size: 30,
+                                )
+                                    : Icon(
+                                  Icons.location_on_outlined,
+                                  color: Colors.redAccent,
+                                  size: 30,
                                 ),
                               ),
                             ),

@@ -1,16 +1,21 @@
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:get/get.dart';
+import 'package:get/get_connect/http/src/utils/utils.dart';
+import 'package:live_location/GetX/getx.dart';
 import 'package:live_location/auth_state.dart';
 import 'package:live_location/home_screen.dart';
 import 'package:live_location/provider/provider.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
-import 'globle.dart';
 
 void main() async{
    WidgetsFlutterBinding.ensureInitialized();
@@ -33,9 +38,10 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (context)=>AppState())
+        ChangeNotifierProvider(create: (context)=>AppState()),
+        ChangeNotifierProvider(create: (context)=>ControllerProvider())
       ],
-      child: MaterialApp(
+      child: GetMaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Flutter Demo',
         theme: ThemeData(
@@ -58,12 +64,15 @@ class CheckLocation extends StatefulWidget{
 }
 
 class _CheckLocationState extends State<CheckLocation> {
+  final CheckBool flag = Get.put(CheckBool());
+
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
     _checkLocationPermission();
-    getsnap();
+    _checkConnection();
+
   }
   @override
   Widget build(BuildContext context){
@@ -74,13 +83,22 @@ class _CheckLocationState extends State<CheckLocation> {
           children: [
             Text('Wellcome...',style: TextStyle(fontWeight:FontWeight.bold,fontSize: 25),),
             SizedBox(height: 20,),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-                child: Image.asset('assets/map.jpg')),
+            Container(
+              height: Get.height*.7,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                  child: Image.asset('assets/map.jpg')),
+            ),
             SizedBox(height: 20,),
             InkWell(
-              onTap: (){
+              onTap: ()async{
+
+                bool flag=await getsnap();
+                if(flag)
                 Navigator.pushReplacement(context, MaterialPageRoute(builder: (context)=>HomeScreen()));
+                else{
+                  Fluttertoast.showToast(msg: 'Some error occur try again');
+                }
               },
               child: Container(
                 height: 50,
@@ -89,7 +107,9 @@ class _CheckLocationState extends State<CheckLocation> {
                   borderRadius: BorderRadius.circular(20),
                   color: Colors.deepPurple,
                 ),
-                child: Center(child: Text("Next",style: TextStyle(fontSize: 20,fontWeight: FontWeight.w500,color: Colors.white),)),
+                child: Obx(
+                    ()=> flag.welcomeflag.value?  Center(child: CircularProgressIndicator(color: Colors.white,)) :Center(child: Text("Next",style: TextStyle(fontSize: 20,fontWeight: FontWeight.w500,color: Colors.white),)),
+                )
               ),
             )
           ],
@@ -153,31 +173,54 @@ void _showPermissionDeniedForeverDialog() {
     },
   );
 }
-  void getsnap() async{
+  Future<bool> getsnap() async{
+     flag.ChangewelcomeFlag();
     var uid =  FirebaseAuth.instance.currentUser!.uid;
     print(uid);
     print('hello');
     try {
+      FirebaseDatabase.instance.ref().child(uid).set({'status':true});
       DocumentSnapshot snapshot = await FirebaseFirestore.instance.collection(
           'users').doc(uid).get();
       print(snapshot['username']);
       Provider.of<AppState>(context,listen: false).snapshot=snapshot;
-      print('s');
+      flag.ChangewelcomeFlag();
+      return true;
     }
     catch(e){
+      flag.ChangewelcomeFlag();
       print('some error occures');
+      return false;
+
+    }
+
+  }
+
+  void _checkConnection()async {
+    final List<ConnectivityResult> connectivityResult = await (Connectivity()
+        .checkConnectivity());
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      // Get.defaultDialog(
+      //   title: 'You are offline',
+      //   content: const Text('Please turn on internet otherwise you can not track location'),
+      //   confirm: TextButton(onPressed: (){Get.back();}, child: Text('Ok'))
+      // );
+      showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Center(child: const Text('You are offline',style: TextStyle(fontWeight: FontWeight.bold),)),
+              content: const Text(
+                  'Please turn on internet otherwise you can not track location'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Center(child: Text('OK')),
+                ),
+              ],
+            );
+          }
+      );
     }
   }
-}
-void getLatlng(String uid)async {
-  Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high
-  );
-  lat=position.latitude;
-  lng=position.longitude;
-  FirebaseDatabase.instance.ref().child('delivery').child(uid).set({
-    'latitude':lat,
-    'longitude':lng
-  });
-  print('$lat  $lng');
 }

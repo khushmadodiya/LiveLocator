@@ -1,5 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:live_location/Auth/login_screen.dart';
 import 'package:live_location/provider/provider.dart';
 import 'package:provider/provider.dart';
@@ -101,8 +104,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 height: 24,
               ),
               InkWell(
-                onTap: (){
-                  AuthMethod().signOut();
+                onTap: ()async{
+                  try{
+                    await  FirebaseDatabase.instance.ref().child(FirebaseAuth.instance.currentUser!.uid).update({'status':false});
+                    AuthMethod().signOut();
+                  }
+                  catch(e){
+                    Fluttertoast.showToast(msg: "some error occure");
+                  }
+
+
                   Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context)=>LoginScreen()), (route) => false);
 
                 },
